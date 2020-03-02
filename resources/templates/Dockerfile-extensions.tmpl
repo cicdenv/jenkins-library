@@ -1,0 +1,29 @@
+# Create jenkins service user/group
+RUN groupadd -g ${jenkinsUserId} ${jenkinsUser} \
+ || addgroup -g ${jenkinsUserId} ${jenkinsUser}
+RUN useradd -u ${jenkinsUserId} -g ${jenkinsGroupId} -d "${homeDir}" -m ${jenkinsUser} \
+ || adduser -u ${jenkinsUserId} -h "${homeDir}" -D -G ${jenkinsUser} ${jenkinsUser}
+
+# Put jenkins service user in the docker group
+RUN groupadd -g ${dockerGroupId} docker \
+ || addgroup -g ${dockerGroupId} docker
+RUN usermod -aG docker ${jenkinsUser} \
+ || adduser ${jenkinsUser} docker
+
+COPY *.sh /tmp/
+RUN \
+  if command -v apt-get ; then  \
+    /tmp/apt-installs.sh;       \
+elif command -v dnf     ; then  \
+    /tmp/dnf-installs.sh;       \
+elif command -v yum     ; then  \
+    /tmp/yum-installs.sh;       \
+elif command -v apk     ; then  \
+    /tmp/apk-installs.sh;       \
+elif command -v pacman  ; then  \
+    /tmp/pacman-installs.sh;    \
+else                            \
+    /tmp/static-installs.sh;    \
+fi
+
+USER ${jenkinsUser}

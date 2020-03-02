@@ -1,0 +1,49 @@
+<p>
+    The Jenkins specific <code>withCaching</code> "wrapper" populates directories/files in the workspace.
+    The directory contents are pulled/pushed to the host/s3 caching mechanisms.
+
+    NOTE: the host cache is cleared when a build agent is stop/started
+</p>
+
+<dl>
+    <dt>
+        <code>withCaching(keys: [<input-files>], folders: [<output-dirs>]) {...}</code>
+    </dt>
+    <dd>
+        <p>
+            Jenkins build agent caching system.
+        </p>
+        <p>
+            Usage:
+        </p>
+        <pre>
+pipeline {
+    environment {
+        BASH_ENV = "${WORKSPACE}/.bashrc"
+
+        YARN_CACHE_FOLDER = '.cache'
+    }
+    stages {}
+        stage('...') {
+            ...
+            steps {
+                withCaching(keys: ['package.json', 'yarn.lock'], folders: ['.cache', 'node_modules']) {
+                    sh 'yarn install --frozen-lockfile'
+                }
+            }
+        }
+        stage('...') {
+            ...
+            steps {
+                withCaching(keys: ['requirements.txt'], folders: ['venv']) {
+                    sh '[[ -d "venv" ]] || virtualenv venv'
+                    sh "echo "source ${WORKSPACE}/venv/bin/activate' > .bashrc"
+                    sh 'pip install -r requirements.txt'
+                }
+            }
+        }
+    }
+}
+        </pre>
+    </dd>
+</dl>

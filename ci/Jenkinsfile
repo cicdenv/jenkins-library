@@ -1,0 +1,84 @@
+// Using the same version of this library for the current Branch or PR#
+def gitRef = env.CHANGE_ID ? env.CHANGE_BRANCH : env.BRANCH_NAME
+library "jenkins-global-library@${gitRef}"
+
+// Test build environment extension compat. tests
+images = [
+    'ubuntu:16.04',    // xenial
+    'ubuntu:18.04',    // bionic
+    'debian:9',        // stretch
+    'debian:10',       // buster
+    'fedora:30',       // 
+    'centos:7',        // 
+    'alpine:3',        // 3.10+
+    'archlinux/base',  // 
+    'busybox',         // 
+    'python:3.7.3',    // stretch
+]
+parallel(images.collectEntries { image -> 
+    [("tools container ${image}"): {
+        def agentEnv = agentContainer.fromImage(image)
+        echo(agentEnv.toString())
+    }] 
+})
+
+// Test inline dockerfile
+echo (
+    agentContainer.from('''
+FROM python:3.7.3
+
+RUN pip install virtualenv
+''').toString()
+)
+
+// Test repo dockerfile
+def agentEnv = agentContainer.fromRepo('ci/Dockerfile')
+
+pipeline {
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+        timeout(time: 30, unit: 'MINUTES')
+        ansiColor('xterm')
+    }
+    agent {
+        docker {
+            image agentEnv.image
+            label agentEnv.nodeLabel
+            args  agentEnv.dockerRunArgs
+
+            customWorkspace agentEnv.customWorkspace
+        }
+    }
+    stages {
+        stage('env') {
+            steps {
+                sh 'env | sort'
+            }
+        }
+        stage('tests') {
+            parallel {
+                stage('docker test') {
+                    steps {
+                        sh 'id; whoami; groups $(whoami); cat /etc/group'
+                        sh 'ls -l /var/run/docker.sock'
+                        sh 'docker --version'
+                        script {
+                            docker.image('fedora').inside {
+                                sh 'env | sort'
+                                sh 'cat /etc/os-release'
+                            }
+                        }
+                    }
+                }
+                stage ('caching test') {
+                    steps {
+                        sh 'echo "requests" > requirements.txt'
+                        withCaching(keys: ['requirements.txt'], values: ['venv']) {
+                            sh 'mkdir -p venv/site-packages'
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

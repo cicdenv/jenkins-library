@@ -1,0 +1,140 @@
+<p>
+    <code>agentContainer</code> global provides pre <code>pipeline { ... }</code>
+    build environment docker image maintenance routines.
+</p>
+
+<dl>
+    <dt>
+        <code>def agentEnv = agentContainer.fromRepoFile('ci/Dockerfile.ci')</code>
+    </dt>
+    <dd>
+        <p>
+            Build / Update Jenkins compatible "tools" image for the declarative pipeline <code>agent { ... }</code> directive
+            from a file in Github.
+        </p>
+        <p>
+            This will source from the same branch / PR (pre-merged) if this is from a multibranch pipeline Job.
+        </p>
+        <p>
+            Typically you'll pull a file from your own repo with this.
+        </p>
+        <p>
+            Usage:
+        </p>
+        <pre>
+def agentEnv = agentContainer.fromRepo('ci/Dockerfile.ci')
+
+pipeline {
+    agent {
+        docker {
+            image agentEnv.image
+            label agentEnv.nodeLabel
+            args  agentEnv.dockerRunArgs
+
+            customWorkspace agentEnv.customWorkspace
+        }
+    }
+    environment {
+        YARN_CACHE_FOLDER    = "${WORKSPACE}/.cache"
+    }
+    stages {
+        stage('yarn install') {
+            steps {
+                withCaching(keys: ['package.json', 'yarn.lock'], folders: ['.cache', 'node_modules']) {
+                    sh 'yarn install --frozen-lockfile'
+                }
+            }
+        }
+    }
+}
+        </pre>
+    </dd>
+    <dt>
+        <code>def agentEnv = agentContainer.fromImage('node:8')</code>
+    </dt>
+    <dd>
+        <p>
+            Build / Update Jenkins compatible "tools" image for the declarative pipeline <code>agent { ... }</code> directive
+            using a standard dockerhub image.
+        </p>
+        <p>
+            Usage:
+        </p>
+        <pre>
+def agentEnv = agentContainer.fromImage('node:8')
+
+pipeline {
+    agent {
+        docker {
+            image agentEnv.image
+            label agentEnv.nodeLabel
+            args  agentEnv.dockerRunArgs
+
+            customWorkspace agentEnv.customWorkspace
+        }
+    }
+    environment {
+        YARN_CACHE_FOLDER    = "${WORKSPACE}/.cache"
+    }
+    stages {
+        stage('yarn install') {
+            steps {
+                withCaching(keys: ['package.json', 'yarn.lock'], folders: ['.cache', 'node_modules']) {
+                    sh 'yarn install --frozen-lockfile'
+                }
+            }
+        }
+    }
+}
+        </pre>
+    </dd>
+    <dt>
+        <code>def agentEnv = agentContainer.from('node:8')
+        </code>
+    </dt>
+    <dd>
+        <p>
+            Build / Update Jenkins compatible "tools" image for the declarative pipeline <code>agent { ... }</code> directive
+            from an "inline" Dockerfile.
+        </p>
+        <p>
+            This is useful for testing pipeline scripts.
+        </p>
+        <p>
+            Usage:
+        </p>
+        <pre>
+def agentEnv = agentContainer.from('''
+FROM python:3.7.3
+
+RUN pip install virtualenv
+''')
+
+pipeline {
+    agent {
+        docker {
+            image agentEnv.image
+            label agentEnv.nodeLabel
+            args  agentEnv.dockerRunArgs
+
+            customWorkspace agentEnv.customWorkspace
+        }
+    }
+    environment {
+        BASH_ENV = "${WORKSPACE}/.bashrc"
+    }
+    stages {
+        stage('yarn install') {
+            steps {
+                withCaching(keys: ['requirements.txt'], folders: ['venv']) {
+                    sh '[[ -d "venv" ]] || virtualenv venv'
+                    sh "echo "source ${WORKSPACE}/venv/bin/activate' > .bashrc"
+                    sh 'pip install -r requirements.txt'
+                }
+            }
+        }
+    }
+}
+        </pre>
+    </dd>
+</dl>

@@ -1,0 +1,24 @@
+<p>
+    The <code>runEnv</code> global is a cicdenv internal Jenkins API.
+</p>
+
+<dl>
+    <dt>
+        <code>runEnv(script)</code>
+    </dt>
+    <dd>
+        <p>
+            Initialize using the current Pipeline script <code>this</code> environment.
+        </p>
+        <p>
+            Usage:
+        </p>
+        <pre>
+runEnv this
+
+pipeline {
+    ...
+}
+        </pre>
+    </dd>
+</dl>

@@ -1,0 +1,55 @@
+<p>
+    The <code>githubFile</code> global provides access to 
+    the Github v4 content API.
+
+    Use this to fetch files from github before the main 
+    "SCM" (Source Code Management) checkout.
+
+    For pre-fetching the build environment settings before the 
+    declarative pipeline script is defined.
+</p>
+<p>
+    This can be used to download specific files.  
+    Sometimes you need this before the normal
+    <code>checkout scm</code> or <code>implicit scm</code> phase.
+</p>
+
+<dl>
+    <dt>
+        <code>githubFile(file: <relativePath>)</code>
+    </dt>
+    <dd>
+        <p>
+            Retrieves the contents of the specified file from the current repo, git ref.
+        </p>
+        <p>
+            Usage:
+        </p>
+        <pre>
+node {
+    stage('pre scm checkout') {
+        githubFile(file: 'ci/Dockerfile')
+    }
+}
+        </pre>
+    </dd>
+    <dt>
+
+        <code>githubFile(file: <relativePath>), outputFile: <relativePath>, org: 'vogtech', repo: '...', ref: <branch|tag|sha1></code>
+    </dt>
+    <dd>
+        <p>
+            Retrieves the contents of the specified file from the specified repo, git ref.
+        </p>
+        <p>
+            Usage:
+        </p>
+        <pre>
+node {
+    stage('pre scm checkout') {
+        githubFile(file: 'ci/Dockerfile', org: 'vogtech', repo: '...', ref: 'v1.0.1')
+    }
+}
+        </pre>
+    </dd>
+</dl>
