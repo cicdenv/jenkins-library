@@ -24,7 +24,7 @@ def ensureImage(String dockerFile) {
     def shortChecksum = shortChecksum(dockerFileContent + installers)
 
     // Ensures the tooling container is available locally.
-    // If the tools container isn't available in the local image cache
+    // If the agent container isn't available in the local image cache
     //   Try pulling from AWS ECR, build only if needed (pushing to ECR afterwards)
     def imageTag = "${env.AWS_MAIN_ACCOUNT_ID}.dkr.ecr.${env.AWS_DEFAULT_REGION}.amazonaws.com/ci-builds:${shortChecksum}"
     sh """
@@ -59,18 +59,20 @@ def fromRepo(Map args) {
     runEnv this
 
     // Required args
-    String repoSpec = args.repoSpec ?: "${RunEnvironment.organization}/${RunEnvironment.repository}"
     String dockerFile = args.dockerFile
 
     // Optional args
     String ref = args.ref ?: RunEnvironment.ref
-
+    String repoSpec = args.repoSpec ?: "${RunEnvironment.organization}/${RunEnvironment.repository}"
+    List repoParts = repoSpec.split('/')
+    String org = repoParts[0]
+    String repo = repoParts[1]
+    
     String imageTag
-
     node(ContainerEnvironment.label) {
-        stage("tools container ${dockerFile}") {
-            // Pre-fetch tools container Dockerfile
-            def baseDockerFile = githubFile(file: dockerFile, org: repoSpec.split('/')[0], repo: repoSpec.split('/')[1], ref: ref)
+        stage("agent container ${dockerFile}") {
+            // Pre-fetch agent container Dockerfile
+            def baseDockerFile = githubFile(file: dockerFile, org: org, repo: repo, ref: ref)
 
             // "Extend" a generic CI tools Dockefile with Jenkins service user requirements
             writeFile(file: 'Dockerfile-jenkins.ci', text: readFile(baseDockerFile) \
@@ -95,7 +97,7 @@ def fromImage(Map args) {
     String image = args.image
 
     node(ContainerEnvironment.label) {
-        stage("tools container ${image}") {
+        stage("agent container ${image}") {
             // "Extend" the base image with Jenkins service user requirements
             writeFile(file: 'Dockerfile-jenkins.ci', text: """
 FROM ${image}
@@ -114,6 +116,53 @@ FROM ${image}
     return agentSettings(imageTag)
 }
 
+def fromTemplate(Map args) {
+    runEnv this
+
+    // Required args
+    String template = args.template
+    Map repoBindings = args.repoBindings
+
+    // Optional args
+    String ref = args.ref ?: RunEnvironment.ref
+    String repoSpec = args.repoSpec ?: "${RunEnvironment.organization}/${RunEnvironment.repository}"
+    List repoParts = repoSpec.split('/')
+    String org = repoParts[0]
+    String repo = repoParts[1]
+
+    String renderedContent
+    String checksum
+    Map bindings = [:]
+    String imageTag
+    node(ContainerEnvironment.label) {
+        stage("agent container pre-fetches") {
+            repoBindings.each { var, file ->
+                githubFile(file: file, org: org, repo: repo, ref: ref)
+                bindings[var] = readFile(file).replaceAll("\\s", "")
+            }
+            renderedContent = new groovy.text.SimpleTemplateEngine()
+                                  .createTemplate(template)
+                                  .make(bindings)
+                                  .toString()
+            checksum = shortChecksum(renderedContent)
+        }
+        stage("agent container ${checksum}") {
+            // "Extend" the Dockefile content with Jenkins service user requirements
+            writeFile(file: 'Dockerfile-jenkins.ci', text: renderedContent \
+                + new groovy.text.SimpleTemplateEngine()
+                    .createTemplate(libraryResource('templates/Dockerfile-extensions.tmpl'))
+                    .make(HostEnvironment.serviceSettings)
+                    .toString())
+
+            // Build/Update the "tools" container image as needed
+            imageTag = ensureImage('Dockerfile-jenkins.ci')
+        }
+    }
+
+    // Agent directive defaults
+    return agentSettings(imageTag)
+}
+
 def from(Map args) {
     runEnv this
 
@@ -122,9 +171,8 @@ def from(Map args) {
     String checksum = shortChecksum(content)
 
     String imageTag
-
     node(ContainerEnvironment.label) {
-        stage("tools container ${checksum}") {
+        stage("agent container ${checksum}") {
             // "Extend" the Dockefile content with Jenkins service user requirements
             writeFile(file: 'Dockerfile-jenkins.ci', text: content \
                 + new groovy.text.SimpleTemplateEngine()
@@ -192,4 +240,15 @@ def fromImage(String image) {
  */
 def from(String content) {
     from(content: content)
+}
+
+/**
+ * "Extends" an inline Dockerfile with Jenkins service user / local docker specific items.
+ *
+ * @param template - Dockerfile content in the form of a triple quoted string
+ * @param repoBindings - map of variable name to repo files
+ * @return Map of declarative agent settings [image, label, args, workspace]
+ */
+def from(String template, Map repoBindings) {
+    fromTemplate(template: template, repoBindings: repoBindings)
 }

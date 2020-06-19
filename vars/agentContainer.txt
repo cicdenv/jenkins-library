@@ -89,7 +89,10 @@ pipeline {
         </pre>
     </dd>
     <dt>
-        <code>def agentEnv = agentContainer.from('node:8')
+        <code>
+            def agentEnv = agentContainer.from('''
+            ...
+            ''')
         </code>
     </dt>
     <dd>
@@ -105,7 +108,7 @@ pipeline {
         </p>
         <pre>
 def agentEnv = agentContainer.from('''
-FROM python:3.7.3
+FROM python:3.8.3
 
 RUN pip install virtualenv
 ''')
@@ -124,7 +127,63 @@ pipeline {
         BASH_ENV = "${WORKSPACE}/.bashrc"
     }
     stages {
-        stage('yarn install') {
+        stage('pip install') {
+            steps {
+                withCaching(keys: ['requirements.txt'], folders: ['venv']) {
+                    sh '[[ -d "venv" ]] || virtualenv venv'
+                    sh "echo "source ${WORKSPACE}/venv/bin/activate' > .bashrc"
+                    sh 'pip install -r requirements.txt'
+                }
+            }
+        }
+    }
+}
+        </pre>
+    </dd>
+    <dt>
+        <code>
+            def agentEnv = agentContainer.from('''
+            FROM python:${pythonVersion}
+            
+            RUN pip install virtualenv \
+             && pip install --upgrade pip
+            ''', [pythonVersion: '.python-version'])
+        </code>
+    </dt>
+    <dd>
+        <p>
+            Build / Update Jenkins compatible "tools" image for the declarative pipeline <code>agent { ... }</code> directive
+            from an "inline" Dockerfile with substitions.
+        </p>
+        <p>
+            This is useful for testing pipeline scripts.
+        </p>
+        <p>
+            Usage:
+        </p>
+        <pre>
+def agentEnv = agentContainer.from('''
+FROM python:${pythonVersion}
+
+RUN pip install virtualenv \
+ && pip install --upgrade pip
+''', [pythonVersion: '.python-version'])
+
+pipeline {
+    agent {
+        docker {
+            image agentEnv.image
+            label agentEnv.nodeLabel
+            args  agentEnv.dockerRunArgs
+
+            customWorkspace agentEnv.customWorkspace
+        }
+    }
+    environment {
+        BASH_ENV = "${WORKSPACE}/.bashrc"
+    }
+    stages {
+        stage('pip install') {
             steps {
                 withCaching(keys: ['requirements.txt'], folders: ['venv']) {
                     sh '[[ -d "venv" ]] || virtualenv venv'
