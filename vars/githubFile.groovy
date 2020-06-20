@@ -44,7 +44,16 @@ def call(Map params) {
     if (params.ref) {
        gitRef = params.ref // Explicitly specified
     } else { // Use current branch|PR ref
-       gitRef = env.CHANGE_ID ? env.CHANGE_BRANCH : env.BRANCH_NAME
+        if (env.CHANGE_ID) {
+            checkoutStrategy = githubCheckoutStrategy()
+            if (checkoutStrategy == "MERGE") {
+                gitRef = "pull/${env.CHANGE_ID}/merge"
+            } else { // HEAD
+                gitRef = env.CHANGE_BRANCH
+            }
+        } else {
+            gitRef = env.BRANCH_NAME
+        }
     }
 
     withCredentials([usernamePassword(credentialsId: 'github-jenkins-token', usernameVariable: 'username', passwordVariable: 'GITHUB_ACCESS_TOKEN')]) {

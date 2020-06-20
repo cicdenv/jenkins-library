@@ -82,6 +82,7 @@ pipeline {
                     steps {
                         script {
                             echo githubCheckoutStrategy()
+                            githubFile(file: 'ci/README.md')
                         }
                     }
                 }
