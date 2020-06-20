@@ -78,6 +78,13 @@ pipeline {
                         }
                     }
                 }
+                stage ('checkoutStrategy test') {
+                    steps {
+                        script {
+                            echo githubCheckoutStrategy()
+                        }
+                    }
+                }
             }
         }
     }
