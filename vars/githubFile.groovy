@@ -48,12 +48,13 @@ def call(Map params) {
     }
 
     withCredentials([usernamePassword(credentialsId: 'github-jenkins-token', usernameVariable: 'username', passwordVariable: 'GITHUB_ACCESS_TOKEN')]) {
+        // -sSfL
         sh """
-            curl -s \
-             -H 'Authorization: token ${GITHUB_ACCESS_TOKEN}' \
-             -H 'Accept: application/vnd.github.v4.raw' \
-             -o ${outputFile} \
-             -L 'https://api.github.com/repos/${org}/${repo}/contents/${file}?ref=${gitRef}'
+            curl --silent --show-error --fail --location            \
+             --header 'Authorization: token ${GITHUB_ACCESS_TOKEN}' \
+             --header 'Accept: application/vnd.github.v4.raw'       \
+             --output ${outputFile}                                 \
+             'https://api.github.com/repos/${org}/${repo}/contents/${file}?ref=${gitRef}'
         """
     }
     
