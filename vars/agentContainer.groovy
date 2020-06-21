@@ -39,8 +39,8 @@ fi
     return imageTag
 }
 
-def agentSettings(String imageTag) {
-    return [
+def agentSettings(String imageTag, Map bindings = [:]) {
+    settings = [
         image: imageTag,
         nodeLabel: ContainerEnvironment.label,
         dockerRunArgs: [
@@ -52,7 +52,10 @@ def agentSettings(String imageTag) {
             '--group-add docker',
         ].join(' '),
         customWorkspace: HostEnvironment.workspaceDir,
+        bindings: bindings,
     ]
+    settings << bindings
+    return settings
 }
 
 def fromRepo(Map args) {
@@ -160,7 +163,7 @@ def fromTemplate(Map args) {
     }
 
     // Agent directive defaults
-    return agentSettings(imageTag)
+    return agentSettings(imageTag, bindings)
 }
 
 def from(Map args) {

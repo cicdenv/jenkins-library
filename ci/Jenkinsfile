@@ -31,6 +31,16 @@ RUN pip install virtualenv
 ''').toString()
 )
 
+// Test inline dockerfile w/bindings
+echo (
+    agentContainer.from('''
+FROM python:${pythonVersion}
+
+RUN pip install virtualenv \
+ && pip install --upgrade pip
+''', [pythonVersion: 'ci/.python-version']).toString()
+)
+
 // Test repo dockerfile
 def agentEnv = agentContainer.fromRepo('ci/Dockerfile')
 
@@ -70,7 +80,7 @@ pipeline {
                         }
                     }
                 }
-                stage ('caching test') {
+                stage('caching test') {
                     steps {
                         sh 'echo "requests" > requirements.txt'
                         withCaching(keys: ['requirements.txt'], values: ['venv']) {
@@ -78,7 +88,7 @@ pipeline {
                         }
                     }
                 }
-                stage ('checkoutStrategy test') {
+                stage('checkoutStrategy test') {
                     steps {
                         script {
                             echo githubCheckoutStrategy()
