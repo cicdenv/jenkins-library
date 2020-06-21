@@ -15,11 +15,11 @@ def call(Map params) {
     runEnv this
 
     def file = params.file // Required
-    def outputFile = params.outputFile ? params.outputFile : new File(file).name // Optional
+    def outputFile = params.outputFile ? params.outputFile : new File(file).path // Optional
 
     // Optional, defaults to ${file}
     if (outputFile.contains('/')) {
-        def subFolder =  new File(outputFile).absoluteFile.parentFile.name
+        def subFolder =  new File(outputFile).parentFile.path
         sh "mkdir -p ${subFolder}"
     }
 
