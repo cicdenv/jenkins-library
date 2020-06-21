@@ -52,7 +52,6 @@ def agentSettings(String imageTag, Map bindings = [:]) {
             '--group-add docker',
         ].join(' '),
         customWorkspace: HostEnvironment.workspaceDir,
-        bindings: bindings,
     ]
     settings << bindings
     return settings
@@ -145,7 +144,7 @@ def fromTemplate(Map args) {
             }
             renderedContent = new groovy.text.SimpleTemplateEngine()
                                   .createTemplate(template)
-                                  .make(bindings)
+                                  .make(bindings.clone())
                                   .toString()
             checksum = shortChecksum(renderedContent)
         }
