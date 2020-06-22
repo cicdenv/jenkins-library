@@ -15,7 +15,7 @@ def call(Map params) {
     runEnv this
 
     def file = params.file // Required
-    def outputFile = params.outputFile ? params.outputFile : new File(file).path // Optional
+    def outputFile = params.outputFile ?: new File(file).path // Optional
 
     // Optional, defaults to ${file}
     if (outputFile.contains('/')) {

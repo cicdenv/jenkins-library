@@ -1,1 +1,1 @@
-FROM buildpack-deps:16.04
+FROM buildpack-deps:20.04

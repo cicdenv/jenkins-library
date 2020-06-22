@@ -1,0 +1,18 @@
+# syntax = docker/dockerfile:experimental
+
+ARG pyVersion=3.8.3
+
+FROM buildpack-deps:buster as gnupg
+RUN set -ex; \
+    apt-get update \
+ && DEBIAN_FRONTEND=noninteractive \
+	apt-get install -y --no-install-recommends \
+	gnupg \
+ && rm -rf /var/lib/apt/lists/*
+
+FROM python:${pyVersion}
+COPY --from=gnupg /usr/bin/gpg /usr/bin/gpg
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install virtualenv \
+ && pip install --upgrade pip
+RUN gpg --help || true

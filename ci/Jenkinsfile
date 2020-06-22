@@ -67,7 +67,7 @@ pipeline {
         }
         stage('tests') {
             parallel {
-                stage('docker test') {
+                stage('docker cli') {
                     steps {
                         sh 'id; whoami; groups $(whoami); cat /etc/group'
                         sh 'ls -l /var/run/docker.sock'
@@ -80,7 +80,7 @@ pipeline {
                         }
                     }
                 }
-                stage('caching test') {
+                stage('caching libs') {
                     steps {
                         sh 'echo "requests" > requirements.txt'
                         withCaching(keys: ['requirements.txt'], values: ['venv']) {
@@ -88,12 +88,17 @@ pipeline {
                         }
                     }
                 }
-                stage('checkoutStrategy test') {
+                stage('checkoutStrategy setting') {
                     steps {
                         script {
                             echo githubCheckoutStrategy()
                             githubFile(file: 'ci/README.md')
                         }
+                    }
+                }
+                stage('cached image builds') {
+                    steps {
+                        cachedImageBuild(ecrRepo: 'samples', dockerFile: 'ci/Dockerfile-multistage', buildArgs: ["pyVersion=3.8.3"])
                     }
                 }
             }

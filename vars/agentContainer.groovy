@@ -48,6 +48,7 @@ def agentSettings(String imageTag, Map bindings = [:]) {
             '--network jenkins',
             "--volume ${HostEnvironment.homeDir}/.aws/config:${HostEnvironment.homeDir}/.aws/config",
             "--volume ${HostEnvironment.homeDir}/.docker/config.json:${HostEnvironment.homeDir}/.docker/config.json",
+            "--volume /usr/bin/docker-credential-ecr-login:/usr/bin/docker-credential-ecr-login:ro",
             "--volume ${HostEnvironment.homeDir}/.ssh/config:${HostEnvironment.homeDir}/.ssh/config",
             '--group-add docker',
         ].join(' '),
