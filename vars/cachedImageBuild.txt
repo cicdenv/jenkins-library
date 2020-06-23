@@ -1,0 +1,48 @@
+<p>
+    <code>cachedImageBuild</code> global provides docker builds w/caching.
+</p>
+
+<dl>
+    <dt>
+        <code>cachedImageBuild(ecrRepo: '<repo>')</code>
+    </dt>
+    <dd>
+        <p>
+            Usage:
+        </p>
+        <pre>
+stage('docker build') {
+    steps {
+        cachedImageBuild(ecrRepo: '<repo>')
+    }
+}
+        </pre>
+    </dd>
+    <dt>
+        <code>cachedImageBuild(ecrRepo: 'samples', 
+                               dockerFile: 'Dockerfile',
+                               context: '.',
+                               tag: '<tag>',
+                               defaultBranch: 'master',
+                               buildArgs: ["arg=${arg}"],
+                               buildStages: ['stage1', 'stage2'])</code>
+    </dt>
+    <dd>
+        <p>
+            Usage:
+        </p>
+        <pre>
+stage('docker build') {
+    steps {
+        cachedImageBuild(ecrRepo: 'samples', 
+                         dockerFile: 'Dockerfile',
+                         context: '.',
+                         tag: '<tag>',
+                         defaultBranch: 'master',
+                         buildArgs: ["arg=${arg}"],
+                         buildStages: ['stage1', 'stage2'])
+    }
+}
+        </pre>
+    </dd>
+</dl>
