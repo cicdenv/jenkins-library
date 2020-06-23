@@ -2,33 +2,71 @@ import com.cicdenv.jenkins.pipeline.RunEnvironment
 
 import java.security.MessageDigest
 
+def hashedId(String id) {
+    def numericId = new BigInteger(1, MessageDigest.getInstance("MD5").digest(id.bytes))
+    return numericId.toString(16).padLeft(32, '0')[0..7]
+}
+
+def stageTags(String ecrRepo, String hashTag, String buildStage, String defaultBranch) {
+    def localJobTag  = "${ecrRepo}:${buildStage}-${hashTag}"
+    def remoteJobTag = "${env.AWS_ECR}/${localJobTag}"
+    def localDefTag  = "${ecrRepo}:${buildStage}-${defaultBranch}"
+    def remoteDefTag = "${env.AWS_ECR}/${localDefTag}"
+    return [
+        localJob:  localJobTag,
+        remoteJob: remoteJobTag,
+        localDef:  localDefTag,
+        remoteDef: remoteDefTag,
+    ]
+}
+
+def finalTags(String ecrRepo, String tag, String defaultBranch) {
+    def localJobTag  = "${ecrRepo}:${tag}"
+    def remoteJobTag = "${env.AWS_ECR}/${localJobTag}"
+    def localDefTag  = "${ecrRepo}:${defaultBranch}"
+    def remoteDefTag = "${env.AWS_ECR}/${localDefTag}"
+    return [
+        localJob:  localJobTag,
+        remoteJob: remoteJobTag,
+        localDef:  localDefTag,
+        remoteDef: remoteDefTag,
+    ]
+}
+
 def call(Map params) {
     // Unique /acct/instance/job tag
-    def hashString = "/${env.AWS_ACCOUNT_NAME}/${env.JENKINS_INSTANCE}/${env.JOB_NAME}"
-    def hashTag = new BigInteger(1, MessageDigest.getInstance("MD5").digest(hashString.bytes)).toString(16).padLeft(32, '0')[0..7]
+    def hashTag = hashedId("/${env.AWS_ACCOUNT_NAME}/${env.JENKINS_INSTANCE}/${env.JOB_NAME}")
 
     // defaults
     def dockerFile = params.dockerFile ?: 'Dockerfile'
     def context = params.context ?: '.'
     def buildArgs = params.buildArgs ? '--build-arg ' + params.buildArgs.join(' --build-arg ') : ''
     def tag = params.tag ?: hashTag
+    def buildStages = params.buildStages ?: sh(// If not naming stages use explicit 'buildStages'
+       script: $/grep 'FROM .* as ' '${dockerFile}' | sed -E -e 's/FROM .* as (.*)/\1/'/$,
+       returnStdout: true
+    ).trim().split('\n')
+    def defaultBranch = params.defaultBranch ?: 'master'
 
     // required
     def ecrRepo = params.ecrRepo
-    def buildStages = params.buildStages ?: sh(
-       script: $/grep 'FROM .* as ' '${dockerFile}' | sed -E -e 's/FROM .* as (.*)/\1/'/$,
-       returnStdout: true
-    ).trim().split('\n') // If not naming stages use explicit 'buildStages'
 
     // Intermediate build stages: Pull/Build/Push incrementally
     Set<String> cacheFrom = []
     for (buildStage in buildStages) {
-        def localTag = "${ecrRepo}:${buildStage}-${hashTag}"
-        def remoteTag = "${env.AWS_ECR}/${localTag}"
+        Map tags = stageTags(ecrRepo, hashTag, buildStage, defaultBranch)
 
-        int pulled = sh(script: "docker pull '${remoteTag}' && docker tag '${remoteTag}' '${localTag}'", returnStatus: true)
+        int pulled = sh(script: "docker pull '${tags.remoteJob}' && docker tag '${tags.remoteJob}' '${tags.localJob}'", returnStatus: true)
+        if (pulled != 0) {
+            pulled = sh(script: """
+                docker pull '${tags.remoteDef}'
+             && docker tag '${tags.remoteDef}' '${tags.localDef}'
+             && docker tag '${tags.remoteDef}' '${tags.remoteJob}'
+             && docker tag '${tags.localDef}'  '${tags.localJob}'
+            """, returnStatus: true)
+        }
         if (pulled == 0) {
-             cacheFrom << "--cache-from '${localTag}'"
+             cacheFrom << "--cache-from '${tags.localJob}'"
         }
         
         sh """
@@ -37,31 +75,52 @@ def call(Map params) {
             --build-arg BUILDKIT_INLINE_CACHE=1 \
             ${buildArgs} ${cacheFrom ? cacheFrom.join(' '): ''} \
             --target "${buildStage}" \
-            --tag '${localTag}' \
-            --tag '${remoteTag}' \
+            --tag '${tags.localJob}' \
+            --tag '${tags.remoteJob}' \
             --file ${dockerFile} ${context}
         """
-        cacheFrom << "--cache-from '${localTag}'"
-        sh "docker push '${remoteTag}'"
+        cacheFrom << "--cache-from '${tags.localJob}'"
+        sh "docker push '${tags.remoteJob}'"
+        if (env.BRANCH_NAME == defaultBranch) {
+            sh """
+                docker tag '${tags.localJob}'  '${tags.localDef}'
+                docker tag '${tags.remoteJob}' '${tags.remoteDef}'
+                docker push '${tags.remoteDef}'
+            """
+        }
     }
 
     // Final image: Pull/Build/Push
-    def localTag = "${ecrRepo}:${tag}"
-    def remoteTag = "${env.AWS_ECR}/${localTag}"
+    Map tags = finalTags(ecrRepo, tag, defaultBranch)
 
-    int pulled = sh(script: "docker pull '${remoteTag}' && docker tag '${remoteTag}' '${localTag}'", returnStatus: true)
-    if (pulled == 0) {
-         cacheFrom << "--cache-from '${localTag}'"
+    int pulled = sh(script: "docker pull '${tags.remoteJob}' && docker tag '${tags.remoteJob}' '${tags.localJob}'", returnStatus: true)
+    if (pulled != 0) {
+        pulled = sh(script: """
+            docker pull '${tags.remoteDef}'
+         && docker tag '${tags.remoteDef}' '${tags.localDef}'
+         && docker tag '${tags.remoteDef}' '${tags.remoteJob}'
+         && docker tag '${tags.localDef}'  '${tags.localJob}'
+        """, returnStatus: true)
     }
-    
+    if (pulled == 0) {
+         cacheFrom << "--cache-from '${tags.localJob}'"
+    }
+
     sh """
     DOCKER_BUILDKIT=1 \
     docker build \
         --build-arg BUILDKIT_INLINE_CACHE=1 \
         ${buildArgs} ${cacheFrom ? cacheFrom.join(' '): ''} \
-        --tag '${localTag}' \
-        --tag '${remoteTag}' \
+        --tag '${tags.localJob}' \
+        --tag '${tags.remoteJob}' \
         --file ${dockerFile} ${context}
     """
-    sh "docker push '${remoteTag}'"
+    sh "docker push '${tags.remoteJob}'"
+    if (env.BRANCH_NAME == defaultBranch) {
+        sh """
+            docker tag '${tags.localJob}'  '${tags.localDef}'
+            docker tag '${tags.remoteJob}' '${tags.remoteDef}'
+            docker push '${tags.remoteDef}'
+        """
+    }
 }
