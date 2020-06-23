@@ -33,6 +33,19 @@ def finalTags(String ecrRepo, String tag, String defaultBranch) {
     ]
 }
 
+/**
+ * Docker build with ECR backed, multistage aware buildkit caching.
+ *
+ * @param params - map of args [
+ *   ecrRepo (Required)       - AWS ECR Repo short name,
+ *   dockerFile (Optional)    - defaults to 'Dockerfile',
+ *   context (Optional)       - defaults to '.',
+ *   buildArgs (Optional)     - extra --build-arg values,
+ *   tag (Optional)           - defaults to hashed 'acct/instance/job',
+ *   buildStages (Optional)   - list of non final build stages - defaults to all 'named' non-final stages,
+ *   defaultBranch (Optional) - 'master',
+ * ]
+ */
 def call(Map params) {
     // Unique /acct/instance/job tag
     def hashTag = hashedId("/${env.AWS_ACCOUNT_NAME}/${env.JENKINS_INSTANCE}/${env.JOB_NAME}")
