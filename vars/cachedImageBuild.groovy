@@ -55,10 +55,16 @@ def call(Map params) {
     def context = params.context ?: '.'
     def buildArgs = params.buildArgs ? '--build-arg ' + params.buildArgs.join(' --build-arg ') : ''
     def tag = params.tag ?: hashTag
-    def buildStages = params.buildStages ?: sh(// If not naming stages use explicit 'buildStages'
-       script: $/grep 'FROM .* as ' '${dockerFile}' | sed -E -e 's/FROM .* as (.*)/\1/'/$,
-       returnStdout: true
-    ).trim().split('\n')
+    def buildStages = params.buildStages ?: []
+    if (buildStages.empty && params.buildStages == null) {
+        int hasStages = sh(script: "grep 'FROM .* as ' '${dockerFile}'", returnStatus: true)
+        if (hasStages == 0) {
+            buildStages = sh(// If not naming stages use explicit 'buildStages'
+                script: $/grep 'FROM .* as ' '${dockerFile}' | sed -E -e 's/FROM .* as (.*)/\1/'/$,
+                returnStdout: true
+            ).trim().split('\n')
+        }
+    }
     def defaultBranch = params.defaultBranch ?: 'master'
 
     // required
