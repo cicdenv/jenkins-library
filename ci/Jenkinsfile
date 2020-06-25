@@ -101,6 +101,11 @@ pipeline {
                         cachedImageBuild(ecrRepo: 'samples', dockerFile: 'ci/Dockerfile-multistage', buildArgs: ["pyVersion=3.8.3"])
                     }
                 }
+                stage('aws secrets manager') {
+                    steps {
+                        echo awsSecret('jenkins-env')['id_rsa.pub']
+                    }
+                }
             }
         }
     }
