@@ -17,7 +17,7 @@ pipeline {
         stage ('env') {
             agent {
                 docker { 
-                    image 'ubuntu:16.04'
+                    image 'ubuntu:20.04'
                 }
             }
             steps {
